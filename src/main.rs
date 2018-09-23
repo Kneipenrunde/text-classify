@@ -9,6 +9,61 @@ use std::io::BufRead;
 //TODO: stems words!
 //TODO: refactor code
 
+struct LabelEncoder {
+    map : HashMap<String,u32>,
+    num_classes : u32,   
+}
+
+impl LabelEncoder {
+    fn new() -> LabelEncoder {
+        LabelEncoder{map : HashMap::new() , num_classes : 0}
+    }
+
+    fn fit(&mut self, labels : &[&str]) {
+        let mut num_classes = self.num_classes;
+        //labels.iter().for_each(|l| self.map.entry(l.to_string()).or_insert_with(|| { self.num_classes += 1; self.num_classes - 1 } ));
+        for label in labels.iter() {
+            self.map.entry(label.to_string()).or_insert_with(|| { num_classes += 1; num_classes - 1 });
+        }
+        self.num_classes = num_classes;
+    }
+
+    fn transform(&self, labels : &[&str]) -> Vec<u32> {
+        labels.iter().map(|l| *self.map.get(*l).expect("Label not yet encoded!")).collect()
+    }
+}
+
+struct Classifier {
+    count_vecs : Vec<HashMap<String,u64>>
+}
+
+impl Classifier {
+    fn new() -> Classifier {
+        Classifier { count_vecs : vec![] }
+    }
+
+    fn train(&mut self, data_input : &[&str], labels_input : &[u64]) {
+        assert!(data_input.len() == labels_input.len(), "Number of class labels does not match number of sample data!");
+        //TODO: implement!
+        for (idx, data) in data_input.iter().enumerate() {
+            for word in data.split_whitespace() {
+                let word_count = self.count_vecs[labels_input[idx] as usize].entry(word.to_string()).or_insert(0u64);
+                *word_count += 1;
+            }        
+        }
+    }
+
+    fn vocabulary_size(data : &HashMap<String,u64>) -> u64 {
+        data.iter().fold(0u64, |sum, (_,count)| sum + count)
+    } 
+
+    fn classify(&self,input : &[&str]) -> Vec<u64> {
+        assert!(self.count_vecs.len() > 0,"Classifier must be trained first!");
+        //TODO: implement!
+        vec![]
+    }
+}
+
 fn vocabulary_size(word_count_vec : &HashMap<String,u64>) -> u64 {
     word_count_vec.iter().fold(0u64, |sum, (_,count)| sum + count)
 }
@@ -20,7 +75,6 @@ fn union(some : &HashMap<String,u64>, other : &HashMap<String,u64>) -> HashMap<S
     }
     for (word, &count) in other {
         let word_count = map.entry(word.to_string()).or_insert(0u64);
-        //println!("{},{}",*word_count,count);
         *word_count += count;
     }
     map
@@ -38,12 +92,11 @@ fn count_words(data : &str) -> HashMap<String, u64> {
 fn main() {
     let mut ham_lines : Vec<String> = vec![];
     let mut spam_lines : Vec<String> = vec![];
-    println!("Hello, world!");
-    //let word_vec = count_words("Hallo Welt, wie geht es dir so? Der Welt geht es gut!");
-    let filename = "SMSSpamCollection.txt";
+
+    //TODO: insert proper file name
+    let filename = "";
     let mut f = File::open(filename).expect("file not found");
     let mut file = BufReader::new(&f);
-    let mut contents = String::new();
     for line in file.lines() {
         let mut l = line.unwrap();
         if l.starts_with("ham") {
@@ -77,7 +130,13 @@ fn main() {
 
 }
 
-fn classify(data : &str, word_vec_ham : &HashMap<String,u64>, word_vec_spam : &HashMap<String,u64>) {
+// computation of resubstitutions error
+fn compute_accuracy(word_vec_ham : &HashMap<String,u64>, word_vec_spam : &HashMap<String,u64>) {
+    let mut correct_classifications = 0u64;
+    
+}
+
+fn classify(data : &str, word_vec_ham : &HashMap<String,u64>, word_vec_spam : &HashMap<String,u64>) -> Vec<f64> {
     let mut propabilities : Vec<f64> = vec![1.0,1.0];
     //TODO: more generic smoothing than just plain 1
     let vocabulary_size_ham = vocabulary_size(word_vec_ham) + 1;
@@ -93,4 +152,5 @@ fn classify(data : &str, word_vec_ham : &HashMap<String,u64>, word_vec_spam : &H
     else {
         println!("It is spam!");
     }
+    propabilities
 }
