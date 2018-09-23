@@ -1,6 +1,5 @@
 [package]
 name = "text-classify"
 version = "0.1.0"
-authors = ["Kai Frerich <kai.frerich@rwth-aachen.de>"]
 
 [dependencies]
