@@ -154,3 +154,17 @@ fn classify(data : &str, word_vec_ham : &HashMap<String,u64>, word_vec_spam : &H
     }
     propabilities
 }
+
+#[test]
+fn test_class_label_encoding() {
+    let mut class_label_encoder = LabelEncoder::new();
+
+    let labels = vec!["class_a", "class_b", "class_a", "class_c"];
+    class_label_encoder.fit(&labels);
+
+    let encoded_labels = class_label_encoder.transform(&labels);
+    assert_eq!(encoded_labels[0],0);
+    assert_eq!(encoded_labels[1],1);
+    assert_eq!(encoded_labels[2],0);
+    assert_eq!(encoded_labels[3],2);
+}
