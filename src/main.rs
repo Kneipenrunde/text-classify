@@ -44,8 +44,13 @@ impl Classifier {
 
     fn train(&mut self, data_input : &[&str], labels_input : &[u64]) {
         assert!(data_input.len() == labels_input.len(), "Number of class labels does not match number of sample data!");
+
+        let num_classes = *labels_input.iter().max().unwrap() + 1;
+        (0..num_classes).for_each(|_| self.count_vecs.push(HashMap::new()));
+        
         //TODO: implement!
         for (idx, data) in data_input.iter().enumerate() {
+            println!("{:?},{:?}",idx,data);
             for word in data.split_whitespace() {
                 let word_count = self.count_vecs[labels_input[idx] as usize].entry(word.to_string()).or_insert(0u64);
                 *word_count += 1;
@@ -53,8 +58,8 @@ impl Classifier {
         }
     }
 
-    fn vocabulary_size(data : &HashMap<String,u64>) -> u64 {
-        data.iter().fold(0u64, |sum, (_,count)| sum + count)
+    fn vocabulary_size(&self, class : usize) -> u64 {
+        self.count_vecs[class].iter().fold(0u64, |sum, (_,count)| sum + count)
     } 
 
     fn classify(&self,input : &[&str]) -> Vec<u64> {
@@ -167,4 +172,27 @@ fn test_class_label_encoding() {
     assert_eq!(encoded_labels[1],1);
     assert_eq!(encoded_labels[2],0);
     assert_eq!(encoded_labels[3],2);
+}
+
+#[test]
+fn test_vocabulary_size() {
+    let data = vec!["Hallo schöne schöne Welt!"];
+    let classes = [0];
+    let mut clf = Classifier::new();
+
+    clf.train(&data,&classes);
+    assert_eq!(clf.vocabulary_size(0), 4);
+}
+
+#[test]
+fn test_count_words() {
+    let data = vec!["Hallo schöne schöne Welt!","Schlechte Welt!"];
+    let classes = [0,1];
+    let mut clf = Classifier::new();
+
+    clf.train(&data, &classes);
+    assert_eq!(clf.count_vecs.len(), 2);
+    assert_eq!(*clf.count_vecs[0].get("Hallo").unwrap(),     1u64);
+    assert_eq!(*clf.count_vecs[0].get("schöne").unwrap(),    2u64);
+    assert_eq!(*clf.count_vecs[1].get("Schlechte").unwrap(), 1u64);
 }
