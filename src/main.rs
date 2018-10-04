@@ -48,9 +48,7 @@ impl Classifier {
         let num_classes = *labels_input.iter().max().unwrap() + 1;
         (0..num_classes).for_each(|_| self.count_vecs.push(HashMap::new()));
         
-        //TODO: implement!
         for (idx, data) in data_input.iter().enumerate() {
-            println!("{:?},{:?}",idx,data);
             for word in data.split_whitespace() {
                 let word_count = self.count_vecs[labels_input[idx] as usize].entry(word.to_string()).or_insert(0u64);
                 *word_count += 1;
@@ -62,10 +60,35 @@ impl Classifier {
         self.count_vecs[class].iter().fold(0u64, |sum, (_,count)| sum + count)
     } 
 
-    fn classify(&self,input : &[&str]) -> Vec<u64> {
-        assert!(self.count_vecs.len() > 0,"Classifier must be trained first!");
-        //TODO: implement!
-        vec![]
+    fn classify(&self,input : &[&str])-> Vec<u64> {
+        assert!(self.count_vecs.len() > 0, "Classifier must be trained first!");
+
+        let probas = self.classify_proba(input);
+        probas.iter().map(|class_probas| {
+            // find index (class label) of maximum probability
+            let mut max_idx = 0;
+            for (idx,&p) in class_probas.iter().enumerate() {
+                if p > class_probas[max_idx] { max_idx = idx; }
+            }
+            max_idx as u64
+        }).collect()
+    }
+
+    fn classify_proba(&self, input : &[&str]) -> Vec<Vec<f64>> {
+        assert!(self.count_vecs.len() > 0, "Classifier must be trained first!");
+        
+        let num_classes = self.count_vecs.len();
+        let mut probas = Vec::with_capacity(input.len());
+        for (idx, data) in input.iter().enumerate() {
+            probas.push(vec![1.0f64;num_classes]);
+
+            for word in data.split_whitespace() {
+                for i in 0..num_classes {
+                    probas[idx][i] *= (*self.count_vecs[i].get(word).unwrap_or(&0) + 1) as f64 / self.vocabulary_size(i) as f64;
+                }    
+            }
+        }        
+        probas
     }
 }
 
@@ -76,7 +99,7 @@ fn vocabulary_size(word_count_vec : &HashMap<String,u64>) -> u64 {
 fn union(some : &HashMap<String,u64>, other : &HashMap<String,u64>) -> HashMap<String,u64> {
     let mut map = HashMap::new();
     for (word, &count) in some {
-        map.insert(word.clone(), count);
+        map.insert(word.clone(), count) ;
     }
     for (word, &count) in other {
         let word_count = map.entry(word.to_string()).or_insert(0u64);
@@ -95,44 +118,51 @@ fn count_words(data : &str) -> HashMap<String, u64> {
 }
 
 fn main() {
-    let mut ham_lines : Vec<String> = vec![];
-    let mut spam_lines : Vec<String> = vec![];
+    let data = vec!["mad mad world","beautiful world"];
+    let classes = [0,1];
+    let mut clf = Classifier::new();
+
+    clf.train(&data,&classes);
+    println!("{:?}",clf.classify_proba(&["mad mad world"]));
+    println!("{:?}",clf.classify_proba(&["beautiful world"]));
+    
+    //let mut ham_lines : Vec<String> = vec![];
+    //let mut spam_lines : Vec<String> = vec![];
 
     //TODO: insert proper file name
-    let filename = "";
-    let mut f = File::open(filename).expect("file not found");
-    let mut file = BufReader::new(&f);
-    for line in file.lines() {
-        let mut l = line.unwrap();
-        if l.starts_with("ham") {
-            //println!("{}",l);
-            ham_lines.push(l.split_off(3));
-        } else {
-            spam_lines.push(l.split_off(4));
-        }
+    //let filename = "";
+    //let mut f = File::open(filename).expect("file not found");
+    //let mut file = BufReader::new(&f);
+    //for line in file.lines() {
+    //    let mut l = line.unwrap();
+    //    if l.starts_with("ham") {
+    //        //println!("{}",l);
+    //        ham_lines.push(l.split_off(3));
+    //    } else {
+    //        spam_lines.push(l.split_off(4));
+    //    }
 
-    }
+    //}
 
-    println!("Found {} ham lines and {} spam lines!",ham_lines.len(),spam_lines.len());
-    // produce word vectors 
-    let mut word_vec_ham = HashMap::new();
-    for line in ham_lines.iter().take(2000) {
-        word_vec_ham = union(&count_words(&line), &word_vec_ham);
-    }
+    //println!("Found {} ham lines and {} spam lines!",ham_lines.len(),spam_lines.len());
+    //// produce word vectors 
+    //let mut word_vec_ham = HashMap::new();
+    //for line in ham_lines.iter().take(2000) {
+    //    word_vec_ham = union(&count_words(&line), &word_vec_ham);
+    //}
     //println!("{:?}",word_vec_ham);
     
-    let mut word_vec_spam = HashMap::new();
-    for line in spam_lines.iter().take(700) {
-        word_vec_spam = union(&count_words(&line), &word_vec_ham);
-    }
+    //let mut word_vec_spam = HashMap::new();
+    //for line in spam_lines.iter().take(700) {
+    //    word_vec_spam = union(&count_words(&line), &word_vec_ham);
+    //}
 
-    println!("Should be ham:");
-    classify(&ham_lines[2050] , &word_vec_ham, &word_vec_spam);
-    classify(&ham_lines[2051] , &word_vec_ham, &word_vec_spam);
-    println!("Should be spam:");
-    classify(&spam_lines[710], &word_vec_ham, &word_vec_spam);
-    classify(&spam_lines[711], &word_vec_ham, &word_vec_spam);
-
+    //println!("Should be ham:");
+    //classify(&ham_lines[2050] , &word_vec_ham, &word_vec_spam);
+    //classify(&ham_lines[2051] , &word_vec_ham, &word_vec_spam);
+    //println!("Should be spam:");
+    //classify(&spam_lines[710], &word_vec_ham, &word_vec_spam);
+    //classify(&spam_lines[711], &word_vec_ham, &word_vec_spam);
 }
 
 // computation of resubstitutions error
@@ -195,4 +225,15 @@ fn test_count_words() {
     assert_eq!(*clf.count_vecs[0].get("Hallo").unwrap(),     1u64);
     assert_eq!(*clf.count_vecs[0].get("schöne").unwrap(),    2u64);
     assert_eq!(*clf.count_vecs[1].get("Schlechte").unwrap(), 1u64);
+}
+
+#[test]
+fn test_classify() {
+    let data = vec!["mad mad world","beautiful world"];
+    let classes = [0,1];
+    let mut clf = Classifier::new();
+
+    clf.train(&data,&classes);
+    assert_eq!(clf.classify(&["mad mad world"])  ,[0]);
+    assert_eq!(clf.classify(&["beautiful world"]),[1]);
 }
