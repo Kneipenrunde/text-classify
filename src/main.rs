@@ -34,12 +34,13 @@ impl LabelEncoder {
 }
 
 struct Classifier {
-    count_vecs : Vec<HashMap<String,u64>>
+    count_vecs : Vec<HashMap<String,u64>>,
+    smoothing : f64,
 }
 
 impl Classifier {
     fn new() -> Classifier {
-        Classifier { count_vecs : vec![] }
+        Classifier { count_vecs : vec![] , smoothing : 1.0f64 }
     }
 
     fn train(&mut self, data_input : &[&str], labels_input : &[u64]) {
@@ -84,110 +85,64 @@ impl Classifier {
 
             for word in data.split_whitespace() {
                 for i in 0..num_classes {
-                    probas[idx][i] *= (*self.count_vecs[i].get(word).unwrap_or(&0) + 1) as f64 / self.vocabulary_size(i) as f64;
+                    probas[idx][i] *= (*self.count_vecs[i].get(word).unwrap_or(&0) as f64 + self.smoothing) / (self.vocabulary_size(i) as f64 + self.smoothing);
+                    let proba = (*self.count_vecs[i].get(word).unwrap_or(&0) as f64 + self.smoothing) / (self.vocabulary_size(i) as f64 + self.smoothing);
+                    //println!("probas[{}][{}] is {} and word is {} with propabilty {} caused by count {} and voc_size {}",idx,i,probas[idx][i],word,proba,(*self.count_vecs[i].get(word).unwrap_or(&0) + 1),self.vocabulary_size(i));
                 }    
             }
         }        
         probas
     }
-}
 
-fn vocabulary_size(word_count_vec : &HashMap<String,u64>) -> u64 {
-    word_count_vec.iter().fold(0u64, |sum, (_,count)| sum + count)
-}
-
-fn union(some : &HashMap<String,u64>, other : &HashMap<String,u64>) -> HashMap<String,u64> {
-    let mut map = HashMap::new();
-    for (word, &count) in some {
-        map.insert(word.clone(), count) ;
+    fn accuracy(&self, input : &[&str], known_labels : &[u64]) -> f64 {
+        assert_eq!(input.len(), known_labels.len(),"TODO: Add msg!");
+        let predictions = self.classify(input);
+        
+        let count = predictions.iter().zip(known_labels.iter()).fold(0,|count, (predicted_label,known_label)| {
+            if predicted_label == known_label { count + 1 }
+            else { count }
+        }); 
+        count as f64 / input.len() as f64
     }
-    for (word, &count) in other {
-        let word_count = map.entry(word.to_string()).or_insert(0u64);
-        *word_count += count;
-    }
-    map
 }
 
-fn count_words(data : &str) -> HashMap<String, u64> {
-    let mut word_vec = HashMap::new();
-    for word in data.split_whitespace() {
-        let count = word_vec.entry(String::from(word)).or_insert(0u64);
-        *count += 1;
-    }
-    word_vec
-}
+fn main() {    let mut data : Vec<String> = vec![];
+    let mut labels : Vec<u64> = vec![];
+    
+    let filename = "";
+    let f = File::open(filename).expect("file not found");
+    let file = BufReader::new(&f);
+    for line in file.lines() {
+        let mut l = line.unwrap();
+        if l.starts_with("ham") {
+            data.push(l.split_off(3)
+            .to_lowercase()
+            .replace("."," ")
+            .replace(","," ")
+            .replace("!"," "));
+            
+            labels.push(0);
+        } else {
+            data.push(l.split_off(4)
+            .to_lowercase()
+            .replace("."," ")
+            .replace(","," ")
+            .replace("!"," "));
 
-fn main() {
-    let data = vec!["mad mad world","beautiful world"];
-    let classes = [0,1];
+            labels.push(1);
+        }
+    }
+
+    let mut input : Vec<&str> = vec![];
+    for l in data.iter() {
+        input.push(&l);
+    }
+
     let mut clf = Classifier::new();
-
-    clf.train(&data,&classes);
-    println!("{:?}",clf.classify_proba(&["mad mad world"]));
-    println!("{:?}",clf.classify_proba(&["beautiful world"]));
+    clf.train(&input[..5000],&labels[..5000]);
+    //println!("{}",clf.classify(&input[4001..]).len());
+    println!("{}",clf.accuracy(&input[5001..],&labels[5001..]));
     
-    //let mut ham_lines : Vec<String> = vec![];
-    //let mut spam_lines : Vec<String> = vec![];
-
-    //TODO: insert proper file name
-    //let filename = "";
-    //let mut f = File::open(filename).expect("file not found");
-    //let mut file = BufReader::new(&f);
-    //for line in file.lines() {
-    //    let mut l = line.unwrap();
-    //    if l.starts_with("ham") {
-    //        //println!("{}",l);
-    //        ham_lines.push(l.split_off(3));
-    //    } else {
-    //        spam_lines.push(l.split_off(4));
-    //    }
-
-    //}
-
-    //println!("Found {} ham lines and {} spam lines!",ham_lines.len(),spam_lines.len());
-    //// produce word vectors 
-    //let mut word_vec_ham = HashMap::new();
-    //for line in ham_lines.iter().take(2000) {
-    //    word_vec_ham = union(&count_words(&line), &word_vec_ham);
-    //}
-    //println!("{:?}",word_vec_ham);
-    
-    //let mut word_vec_spam = HashMap::new();
-    //for line in spam_lines.iter().take(700) {
-    //    word_vec_spam = union(&count_words(&line), &word_vec_ham);
-    //}
-
-    //println!("Should be ham:");
-    //classify(&ham_lines[2050] , &word_vec_ham, &word_vec_spam);
-    //classify(&ham_lines[2051] , &word_vec_ham, &word_vec_spam);
-    //println!("Should be spam:");
-    //classify(&spam_lines[710], &word_vec_ham, &word_vec_spam);
-    //classify(&spam_lines[711], &word_vec_ham, &word_vec_spam);
-}
-
-// computation of resubstitutions error
-fn compute_accuracy(word_vec_ham : &HashMap<String,u64>, word_vec_spam : &HashMap<String,u64>) {
-    let mut correct_classifications = 0u64;
-    
-}
-
-fn classify(data : &str, word_vec_ham : &HashMap<String,u64>, word_vec_spam : &HashMap<String,u64>) -> Vec<f64> {
-    let mut propabilities : Vec<f64> = vec![1.0,1.0];
-    //TODO: more generic smoothing than just plain 1
-    let vocabulary_size_ham = vocabulary_size(word_vec_ham) + 1;
-    let vocabulary_size_spam = vocabulary_size(word_vec_spam) + 1;
-    for word in data.split_whitespace() {
-        propabilities[0] *= (*word_vec_ham.get(word).unwrap_or(&0) + 1) as f64 / vocabulary_size_ham as f64;
-        propabilities[1] *= (*word_vec_spam.get(word).unwrap_or(&0) + 1) as f64 / vocabulary_size_spam as f64;
-    }
-    println!("{:?}",propabilities);
-    if propabilities[0] > propabilities[1] {
-        println!("It is ham!");
-    }
-    else {
-        println!("It is spam!");
-    }
-    propabilities
 }
 
 #[test]
@@ -236,4 +191,14 @@ fn test_classify() {
     clf.train(&data,&classes);
     assert_eq!(clf.classify(&["mad mad world"])  ,[0]);
     assert_eq!(clf.classify(&["beautiful world"]),[1]);
+}
+
+#[test]
+fn test_accuracy() {
+    let data = vec!["mad mad world","beautiful world"];
+    let classes = [0,1];
+    let mut clf = Classifier::new();
+
+    clf.train(&data,&classes);
+    assert_eq!(clf.accuracy(&data,&classes),1.0);
 }
