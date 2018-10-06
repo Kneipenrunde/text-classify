@@ -5,9 +5,14 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::BufRead;
 
-//TODO: clean strings from some chars  
-//TODO: stems words!
-//TODO: refactor code
+//TODO: Clean strings from some chars  
+//TODO: Stems words!
+//TODO: Refactor code
+//TODO: Data Augmentation 
+//TODO: Add different data sets 
+//TODO: Add documentation
+//TODO: Add means for cross validation
+//TODO: Make smoothing hyperparameter, rework smoothing!
 
 struct LabelEncoder {
     map : HashMap<String,u32>,
