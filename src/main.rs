@@ -13,6 +13,7 @@ use std::io::BufRead;
 //TODO: Add documentation
 //TODO: Add means for cross validation
 //TODO: Make smoothing hyperparameter, rework smoothing!
+//TODO: Rustfmt!
 
 struct LabelEncoder {
     map : HashMap<String,u32>,
@@ -35,6 +36,21 @@ impl LabelEncoder {
 
     fn transform(&self, labels : &[&str]) -> Vec<u32> {
         labels.iter().map(|l| *self.map.get(*l).expect("Label not yet encoded!")).collect()
+    }
+}
+
+struct StopWordFilter {
+    stop_words : Vec<String>,
+}
+
+impl StopWordFilter {
+    fn new() -> StopWordFilter {
+        StopWordFilter{ stop_words : vec![] }
+    }
+
+    fn filter(&self, data : &str) -> String {
+        //TODO: implement
+        String::new()
     }
 }
 
@@ -91,8 +107,6 @@ impl Classifier {
             for word in data.split_whitespace() {
                 for i in 0..num_classes {
                     probas[idx][i] *= (*self.count_vecs[i].get(word).unwrap_or(&0) as f64 + self.smoothing) / (self.vocabulary_size(i) as f64 + self.smoothing);
-                    let proba = (*self.count_vecs[i].get(word).unwrap_or(&0) as f64 + self.smoothing) / (self.vocabulary_size(i) as f64 + self.smoothing);
-                    //println!("probas[{}][{}] is {} and word is {} with propabilty {} caused by count {} and voc_size {}",idx,i,probas[idx][i],word,proba,(*self.count_vecs[i].get(word).unwrap_or(&0) + 1),self.vocabulary_size(i));
                 }    
             }
         }        
@@ -147,7 +161,6 @@ fn main() {    let mut data : Vec<String> = vec![];
     clf.train(&input[..5000],&labels[..5000]);
     //println!("{}",clf.classify(&input[4001..]).len());
     println!("{}",clf.accuracy(&input[5001..],&labels[5001..]));
-    
 }
 
 #[test]
@@ -166,25 +179,27 @@ fn test_class_label_encoding() {
 
 #[test]
 fn test_vocabulary_size() {
-    let data = vec!["Hallo schöne schöne Welt!"];
+    let data = vec!["such a mad mad world"];
     let classes = [0];
     let mut clf = Classifier::new();
 
     clf.train(&data,&classes);
-    assert_eq!(clf.vocabulary_size(0), 4);
+    assert_eq!(clf.vocabulary_size(0), 5);
 }
 
 #[test]
 fn test_count_words() {
-    let data = vec!["Hallo schöne schöne Welt!","Schlechte Welt!"];
+    let data = vec!["mad mad world","beautiful world"];
     let classes = [0,1];
     let mut clf = Classifier::new();
 
     clf.train(&data, &classes);
     assert_eq!(clf.count_vecs.len(), 2);
-    assert_eq!(*clf.count_vecs[0].get("Hallo").unwrap(),     1u64);
-    assert_eq!(*clf.count_vecs[0].get("schöne").unwrap(),    2u64);
-    assert_eq!(*clf.count_vecs[1].get("Schlechte").unwrap(), 1u64);
+    assert_eq!(*clf.count_vecs[0].get("world").unwrap(), 1u64);
+    assert_eq!(*clf.count_vecs[0].get("mad").unwrap(), 2u64);
+    assert_eq!(clf.count_vecs[0].get("beautiful"), Option::None);
+    assert_eq!(*clf.count_vecs[1].get("beautiful").unwrap(), 1u64);
+    assert_eq!(clf.count_vecs[1].get("mad"), Option::None);
 }
 
 #[test]
@@ -206,4 +221,21 @@ fn test_accuracy() {
 
     clf.train(&data,&classes);
     assert_eq!(clf.accuracy(&data,&classes),1.0);
+}
+
+#[test]
+#[should_panic]
+fn test_untrained_classifier() {
+    let data = vec!["mad mad world"];
+    let mut clf = Classifier::new();
+
+    clf.classify(&data);
+}
+
+#[test]
+fn test_stop_word_filter() {
+    let data = "a mad mad world";
+    let stop_word_filter = StopWordFilter::new();
+
+    assert_eq!(&stop_word_filter.filter(data), "mad mad world");
 }
